@@ -1,0 +1,49 @@
+notes
+
+Elixir Syntax
+  CoffeeScript is to JavaScript
+  as
+  Elixir is to Erlang
+
+Right?
+
+Wrong.
+
+# Changing Paradigms
+
++ OOP to FP
++ Managed Concurrency to Automatic Concurrency
+
+
+
+# Syntax
+You like curly brackets? We got 'em.
+You like square brackets? We got those too.
+You like semicolons? Fuck you.
+
+
+# Concurrency
+  + Mutexes
+  + Semaphores
+  + AtomicTypes
+  + and the list goes on...
+
+
+THESE ARE PROBLEMS FOR MUTABLE LANGUAGES.
+
+# Processes
++ Not your grandma's process (unless your grandma does Erlang)
+
+1. "spun up" in sub microseconds
+1. NO shared data
+1. Message passing
+1. Monitor each other for failure.
+
+
+Erlang is an OS.
+
+
+
+# design
+
+top level (come up with the way you want to do things. then implement the how.)
