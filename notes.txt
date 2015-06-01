@@ -47,3 +47,384 @@ Erlang is an OS.
 # design
 
 top level (come up with the way you want to do things. then implement the how.)
+
+
+# Why functional?
+
+
+* What state is some object in at any given moment? (This is hard to reason about)
+* concurrency
+* programming should be about transforming data (not hiding state(sorry OOP))
+
+
+# Rebuttals?
+
+Q: doesn't immutable state lead to copying TONS of data?
+A: WAIT FOR THE PRESENTATION.
+
+
+# Pattern Matching (is everything)
+
+* bind variables
+* "branch" logically
+* declarative code
+
+
+# "Assignment"
+
+* There is no assignment.
+* There is only pattern matching followed by binding.
+
+How does it work?
+
+binding is like assertion.
+the code `x = 1` is an attempt to get the pattern on the right to match the pattern on the left
+when the patterns can be matched the right-pattern is bound to the variable on the left
+
+##### simple
+
+```
+iex(1)> x = 1  # x can match 1 thus x is bound to 1
+1
+iex(2)> x  # x is in fact bound to 1
+1
+iex(3)> 1 = x  # just like a passing assertion, no error
+1
+iex(4)> 2 = x  # error
+** (MatchError) no match of right hand side value: 1
+```
+
+
+##### complex
+
+notice the underscore. it is a discarded variable. _ will match anything and will always be unbound!
+
+```
+iex(1)>{:+, _, args} = quote do 1 + 1 end
+{:+, [context: Elixir, import: Kernel], [1, 1]}
+iex(2)>args
+[1, 1]
+
+```
+
+##### another
+
+```
+iex(1)> [x, x] = [1, 1]
+[1, 1]
+iex(2)> x
+1
+iex(3)> [y, y] = [1, 2]
+** (MatchError) no match of right hand side value: [1, 2]
+```
+
+##### variable protection
+
+we want x to remain 1
+
+```
+iex(1)> x = 1
+1
+iex(2)> [x, 3] = [2, 3]
+[2, 3]
+iex(3)> x
+2
+```
+
+the previous is not what we wanted to happen. x was not protected. x needs a hardhat.
+
+```
+iex(1)> x = 1
+1
+iex(2)> [^x, 3] = [2, 3]
+** (MatchError) no match of right hand side value: [2, 3]
+```
+
+##### THIS IS ALGEBRA.
+
+Look at this code:
+```
+^x = 4 - x
+```
+
+Under what conditions would the previous code not cause an error (hint: solve for x)
+
+x + x = 4 - x + x
+x + x = 4
+2x = 4
+2x / 2 = 4 / 2
+x = 2
+
+Let's test this out.
+
+
+```
+iex(1)> x = 2
+2
+iex(2)> ^x = 4 - x
+2
+iex(3)> x = 3
+3
+iex(4)> ^x = 4 - x
+** (MatchError) no match of right hand side value: 1
+```
+
+
+# IMMUTABLE DATA EVERYWHERE
+
+Mutable data is the devil you've been looking for...
+
+some programming lang
+```
+value = 100
+do_something_with(value)
+print value
+```
+The above prints `100`? Right?
+
+```
+my_list = [1, 2, 3]
+do_something_with(my_list)
+print my_list
+```
+The above prints `[1, 2, 3]`? Right?
+
+
+
+
+
+There is no way to know what the value of `my_list` is.
+
+What happens if this same list is exposed to execution in multiple threads?
+
+In Elixir, this is a non-issue. A list [1,2,3] is created in memory. Nothing ever changes the list [1,2,3].
+
+##### POTENTIAL ISSUES WITH PERFORMANCE
+
+###### Copying structures
+For many, the efficiency of building entire data structures every time a new variable is bound is a concern.
+Fear not. That is not what is happening. In Elixir(read Erlang), data is immutable. When a child structure uses
+any of the components of the parent, the child becomes a branch on the parent structure (think version control).
+This branch + parent is the child. This method of structure building allows extremely fast, efficient handling
+of "copying" structured data. Boom.
+
+example:
+iex(1)> x = [2,1]
+[2, 1]
+iex(2)> y = [3 | x]
+[3, 2, 1]
+
+
+y is a list that consists of a head (3) and a tail (x which is [2, 1])
+
+
+/me is about to wreck someone's day
+
+
+How many elements in y ?
+
+3
+
+How many lists in y ?
+
+4 (for real)
+
+
+```
+iex(6)> length(y)
+3
+iex(7)> [3| [2| [1| []]]] == y
+true
+```
+
+lists are a recursive structure.
+
+
+##### Processes and GC - Processes
+
+A Process:
+
+* is not a operating system process.
+* is isolated.
+* uses a small amount of memory.("A newly spawned Erlang process uses 309 words of memory in the non-SMP emulator without HiPE support.") (link)[http://www.erlang.org/doc/efficiency_guide/processes.html]
+* has its own unique Process ID (pid; included in the 309 words of memory)
+* has its own inbox (refered to by pid)
+* has its own heap and stack
+* has its own garbage collection
+
+##### Elixir Processes and GC - GC
+
+Code is written to take advantage of these Processes and as such many, many
+Processes are 'networked' together to form an application.
+
+There are benefits to this model:
+* heaps remain small - GC is faster.
+* Each Process's GC is an idependent action (because each has it's own heap).
+* There is no world freezing GC.
+* When a process terminates it is not GCed. It is discarded. (usually (see heap reallocation))
+
+
+Types (Hooray!!!)
+Value types:
+	* Integers
+		* arbitrary size
+		* underscorable
+		* 1000000000000000000000000000000000000_00000_00000_00000_00000_00000
+		* 4_0_9_5 #legit
+		* 0xFFF # hex for 4095
+		* 0b111111111111 # binary for 4095
+		* 0o7777 # octal for 4095
+	* Floats
+		* 1.2
+		* 10.0e9
+		* 10.0e-9
+		* max value ~10.0e308
+		* 16 places of precision
+	* Atoms
+		* :boom
+		* :"Some atom with spaces"
+		* a literal that starts with colon always
+		* an atom refers into an atom table
+		* not GCed
+		* max count allowed 1048576 (then death)
+	* Regex
+		* ~r/foo/
+
+	* Bools
+		* no
+	* Strings
+		* no
+	* Null
+		* no
+	* Joking?
+		* no
+
+Composite Types:
+	* Ranges
+		* a range between integers
+		* inclusive
+		* 1..10 (iterable)
+		* 1..10.1 (uniterable)
+		* see ranger.exs
+	* Tuples
+		* {:ok, result} = File.read("README.md")
+		* delimited by `{` and `}`
+		* ordered
+		* conventionally used for returning from IO funcs
+	* Lists
+		* recursive
+		* singly-linked
+		* two forms:
+			* `[head | tail]` where `tail` is a list and head is a whatever.
+			* `[]` empty
+	* Keyword Lists
+		* Ordered Key Value Store
+		* [{:name, "Jason"}]
+		* lists with bi-tuples in them where the first element of the bi-tuple is an atom
+		* [name: "Jason"] == [{:name, "Jason"}] #sugar
+		* nothing special beyond the sugar.
+		* used mostly for keyword args / options of functions
+	* Maps
+		* Unordered Key-Value Store
+		* `%{1 => "one", 2 => "two", 3 => 3}`
+		* `css = %{ border: "1px solid blue", height: 30, width: 40 }`
+		* `mixed = %{ {:ok, 1} => 1, 1 => "one", red: true}`
+		* bracket access
+			* `mixed[1]
+			* `mixed[:red]
+			* `mixed[{:ok, 1}]`
+			* `nil` for non-member `css[:wtf_is_this]`
+		* dot access
+			* `mixed.red`
+			* `css.border`
+			* for stringy keys only
+			* `KeyError` for non-member (`css.wtf_is_this`)
+		* Arbitrary keys (?)
+
+	* Binaries
+		* A thing that looks a lot like Strings
+			* "Jason"
+			* age = 31; "Jason is #{age}"  # this is valid, but you're an asshole if you type this anywhere but the console.
+
+		* Actual Binary Manipulation
+			```
+			iex(1)> num = << 2 :: size(2), 1 :: size(4), 3 :: size(2)>>
+			<<135>>
+			# the above is a 3 part byte of the shape 2,4,2 -> 22 4444 22
+			iex(2)> 0b10
+			2
+			iex(3)> 0b0001
+			1
+			iex(4)> 0b11
+			3
+			iex(5)> 0b10000111
+			135
+			iex(6)> byte_size num
+			1
+			```
+
+	* HashDict
+		* Efficient Key-Value Store
+		* Efficient AF (as f*) with large number of keys
+		* no literal syntax (afaik)
+		* x = HashDict.new # for new ones
+		* y = HashDict.put(x, "hungry?", true)
+
+	* HashSet
+		* A set.
+		* You get it.
+
+System Types:
+	* Ports
+		* for IO and interaction with binaries
+
+	* Pids
+		* identifies a process
+
+	* References
+		* for referencing References
+		* usually timers and unique things
+		* A reference is a term which is unique in an Erlang runtime system, created by calling make_ref/0.
+
+
+Special Types:
+	* Truthiness
+		* truthiness is represented by an atom :true
+		* or by an identifier true
+		* true == :true
+
+	* Falseyness
+		* falseyness is represented by an atom :false
+		* or by an identifier false
+		* false == :false
+
+	* Nullyness
+		* nullyness is represented by an atom :nil
+		* or by an identifier nil
+		* nil == :nil
+
+Modules:
+	* `defmodule` macro
+	* CapitalizedCamelCase
+	* `defmodule MyModule do` ... `end` syntax
+	* convention: one per file
+	* convention: file is named underscore case of module name  `MyModule` goes in `my_module.ex` or `.exs`
+	* If you break these conventions and your name is not José Valim then José Valim will come get you in your sleep.
+
+Defined Functions:
+	* `def` macro
+	* only definable inside Modules
+	* multiline syntax:   `def my_func do` ... `end`
+	* single line syntax: `def square(x), do: x * x`  (notice the lack of the `end` keyword)
+	* private functions:  `defp my_private_func` ... `end`
+	* private functions:  only direct accessible within the Module of its definition
+	* called with or without parens `MyModule.myfunc x` or `MyModule.myfunc(x)`
+
+Anonymous Functions:
+	* `fn` keyword (macro? I'd bet it is.)
+	* `sq = fn item -> item * item end`
+	* called with dot syntax: `sq.(2)`
+	* so that no calls become ambiguous dot syntax is necessary
+	* multi-bodied
+	```
+	fn
