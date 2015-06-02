@@ -8,21 +8,43 @@ Elixir Syntax
 Right?
 
 Wrong.
+	1. errors are better.
+	2. custom types.
+	3. custom behaviors.
+	4. META-PROGRAMMING.
+	5. More useful abstractions of OTP concepts
+
+Why
+
 
 # Changing Paradigms
-
 + OOP to FP
 + Managed Concurrency to Automatic Concurrency
 
 
 
 # Syntax
+Rubyesque Syntax (in every way)
 You like curly brackets? We got 'em.
 You like square brackets? We got those too.
 You like semicolons? Fuck you.
+No `return` word.
+Every call returns something implicitly (last expression)
+Functions have arity. (arity refers to the number of arguments)
+Pattern Matching everywhere.
 
 
-# Concurrency
+# Ruby
+('a'..'z').each {    |c|    puts     c   }
+
+#Elixir
+?a..?z |> Enum.each fn c -> IO.puts [c] end
+
+elixir is ruby is elixir
+
+
+
+# Concurrency in Mutable languages.
   + Mutexes
   + Semaphores
   + AtomicTypes
@@ -317,6 +339,15 @@ Composite Types:
 		* two forms:
 			* `[head | tail]` where `tail` is a list and head is a whatever.
 			* `[]` empty
+		* `++` for concat
+		* `--` for remove
+		* `--` and `++` are sometimes inefficient.
+
+		```
+		* iex(17)> [1] ++ [2,3] -- [3]
+		* [1, 2]
+		```
+
 	* Keyword Lists
 		* Ordered Key Value Store
 		* [{:name, "Jason"}]
@@ -340,13 +371,22 @@ Composite Types:
 			* for stringy keys only
 			* `KeyError` for non-member (`css.wtf_is_this`)
 		* Arbitrary keys (?)
+		* changing values
+			```
+			iex(8)> some_map = %{ a: "ay", b: "bee", c: "dee"}
+			%{a: "ay", b: "bee", c: "dee"}
+			iex(9)> some_map = %{ some_map | c: "sea" }
+			%{a: "ay", b: "bee", c: "sea"}
+			```
 
 	* Binaries
 		* A thing that looks a lot like Strings
 			* "Jason"
 			* age = 31; "Jason is #{age}"  # this is valid, but you're an asshole if you type this anywhere but the console.
-
+			* Ridiculously good support for Unicode. (maybe because José Valim has/had the need)
+			* `<>` for concat
 		* Actual Binary Manipulation
+			* `<>` for concat
 			```
 			iex(1)> num = << 2 :: size(2), 1 :: size(4), 3 :: size(2)>>
 			<<135>>
@@ -373,6 +413,25 @@ Composite Types:
 	* HashSet
 		* A set.
 		* You get it.
+
+	* Char List
+		* a list of ints that map to codepoints.
+		* the devil.
+		* single quoted "strings" (they are not strings) that look like 'this right here' are actually lists of ints.
+		* a crappy type of string that Erlang deals with.
+		* any list of ints that can be represented as a charlist is represented as a charlist.
+		* is a list of ints any different than a char list? No.
+		* DONT USE THIS TYPE. YOU'LL WANT TO DIE. I WISH IT WAS GONE.
+		```
+		iex(28)> [108, 111, 108]
+		'lol'
+		```
+
+	* Structs
+		* A predefined, compile-time guarenteed to-be-shaped map.
+		* Resembles OOP class.
+		* Don't be tempted to use this as a class. (You could, but then you'd be doing OOP)
+
 
 System Types:
 	* Ports
@@ -403,6 +462,133 @@ Special Types:
 		* or by an identifier nil
 		* nil == :nil
 
+Other Language Features:
+
+	* PIPELINEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE!!!!!!!!!!!!!!!!!!!!!!
+		* compose functions in a way that makes sense instead of backward or using intermediate useless variables.
+		* WATCH THIS F**K**G MAGIC
+
+		With intermediates variables:
+
+		```
+		customer     = Query.get_customer(id)
+		stores       = Store.near(customer, [miles: 5])
+		sales        = Sales.get_from_list(stores)
+		sorted_sales = Enum.sort(sales, fn s1, s2 -> s1.percentage > s2.percentage end)
+
+		```
+
+		With nested function calls:
+
+		```
+		#This is totally lame.
+		sorted_sales = Enum.sort(Sales.get_from_list(Store.near(Query.get_customer(id), [miles: 5])), fn s1, s2 -> s1.percentage > s2.percentage end)
+		```
+
+		With pipes:
+		```
+		sorted_sales = id
+		|> Query.get_customer
+		|> Store.near([miles: 5])
+		|> Sales.get_from_list
+		|> Enum.sort(fn s1, s2 -> s1.percentage > s2.percentage end)
+
+		# This makes reasoning about what exactly is going on very easy.
+		```
+
+	* Macros
+		* In a bit.
+
+	* Running code from other modules
+		* all "imports/requires/aliases" are only applicable to current block and its sub-blocks. (read 'lexically scoped')
+		* private functions cannot be imported (duh.)
+		* `require`
+			* `require MyMod` makes functions in `MyMod` with `MyMod.some_func` syntax.
+		* `import`
+			* `import MyMod` makes functions in `MyMod` available with `some_func` syntax (naked functions)
+			* implicit imports are frowned upon.
+			* ambiguous calls to functions (`Kernel.length` always available as `length` vs imported `String`'s `length`) will not compile.
+			```
+			defmodule NoCompile do
+			  import String
+
+			  def wont_work(x) do
+			    length x
+			  end
+			end
+			```
+			```
+			iex(30)> c "no_compile.exs"
+
+			== Compilation error on file no_compile.exs ==
+			** (CompileError) no_compile.exs:5: function length/1 imported from both String and Kernel, call is ambiguous
+			    (elixir) src/elixir_dispatch.erl:110: :elixir_dispatch.expand_import/6
+			    (elixir) src/elixir_dispatch.erl:81: :elixir_dispatch.dispatch_import/5
+			    (elixir) src/elixir_exp_clauses.erl:16: :elixir_exp_clauses.def/5
+			    (elixir) src/elixir_def.erl:160: :elixir_def.translate_definition/8
+			    (elixir) src/elixir_def.erl:82: :elixir_def.store_definition/9
+			```
+		* `import` options
+			* allows excellent controls over imports
+			* import String, except: [length:1]
+			* import String, only: [to_float:1]
+			* import String, only: :functions
+			* import MyMod, only: :macros
+		* `alias`
+			* less typing?
+			* `alias String, :as S`
+			* `alias MyMod.SubMod` makes `SubMod.func` syntax available as opposed to `MyMod.SubMod.func`
+
+		* `use`
+			* this is the way to invoke macrofication/behavior from other modules.
+			* wait for macros, please
+
+		* Erlang
+			* Erlang modules are called with atom syntax
+			* :observer.start
+			* :math.pow(5,3)
+
+
+	* List Comprehensions
+		* For when you don't know about recursion or the Enum module?
+		* I dont get it.
+
+		```
+		iex(10)> for x <- [1,2,3,4], do: x * x
+		[1, 4, 9, 16]
+		```
+
+		* quick swap
+		```
+		iex(11)> people = [
+			{"jason", "datamelon"},
+			{"ian",   "hiring solved"},
+			{"austin", "ASU and NASA"},
+		]
+		[{"jason", "datamelon"}, {"ian", "hiring solved"}, {"austin", "ASU and NASA"}]
+		iex(12)> for {person, org} <- people, do: {org, person}
+		[{"datamelon", "jason"}, {"hiring solved", "ian"}, {"ASU and NASA", "austin"}]
+		```
+		* whoopty doo
+
+Protocols:
+	* 7 builtins
+		* Access - bracket access for keyword lists, maps, hashdicts.
+		* Enumerable
+			* used by Enum and Stream
+			* turns Collectables to Lists
+			* allows for infinite collections, resources, and structures with fixed shape
+		* Collectable - turns Enumerable into a collection
+		* Inspect - print anything.
+		* List.Chars - turns things to char_list type. The Devil, Bobby Boucher.
+		* Range.Iterator - A protocol used for iterating range elements.
+		* String.Chars - A protocol for converting a structure to a Binary (only if applicable)
+			*allows for interpolation*"foo#{bar}"; equivalent to "foo" <> to_string(bar)
+
+
+
+
+
 Modules:
 	* `defmodule` macro
 	* CapitalizedCamelCase
@@ -410,6 +596,9 @@ Modules:
 	* convention: one per file
 	* convention: file is named underscore case of module name  `MyModule` goes in `my_module.ex` or `.exs`
 	* If you break these conventions and your name is not José Valim then José Valim will come get you in your sleep.
+	* attributes `@attrthing` only at top of module
+
+
 
 Defined Functions:
 	* `def` macro
@@ -419,6 +608,9 @@ Defined Functions:
 	* private functions:  `defp my_private_func` ... `end`
 	* private functions:  only direct accessible within the Module of its definition
 	* called with or without parens `MyModule.myfunc x` or `MyModule.myfunc(x)`
+	* Passable with ampersand syntax. WAIT FOR IT.\
+	* Can have guard clauses.
+	* Can have default args.
 
 Anonymous Functions:
 	* `fn` keyword (macro? I'd bet it is.)
@@ -427,4 +619,71 @@ Anonymous Functions:
 	* so that no calls become ambiguous dot syntax is necessary
 	* multi-bodied
 	```
-	fn
+	decider = fn
+		1 -> "only one"
+		2 -> "two"
+		3 -> "three"
+		x -> handle_edge_case(x)
+	end
+
+	function_maker = fn -> (fn -> "hi" end) end
+	```
+	* close over their shadowing scope (closures)
+	```
+	iex(3)> x = 1
+	1
+	iex(4)> fun = fn -> x end
+	#Function<20.106461118/0 in :erl_eval.expr/5>
+	iex(5)> fun.()
+	1
+	iex(6)> x = 3333
+	3333
+	iex(7)> fun.()
+	1
+
+	```
+	* passable as arguments
+	* alternate syntax (only use for very simple things)
+	```
+	&(&1 + &2) # is equivalent to
+	fn item1, item2 -> item1 + item2 end
+	```
+
+	* ampersand is also used to 'anonymize named functions'
+	```
+	iex(2)> [1,2,3,4] |> Enum.map(&Integer.is_odd/1)
+	[true, false, true, false]
+
+	```
+
+#
+
+# Pattern Matching
+	ANY PATTERN CAN BE MATCHED*. *except value-matching for maps. This would be a poor use case though. its a reverse mapping. can have multiple potential matches. has no guarentee of result. violates functional programming principles. the list goes on...
+	* There is no soft failure.
+	* Exhaustive matching is recommended.
+	* Begin thinking in pattern matching. Realize the other languages you use have nothing like it. Get sad.
+	* Allows code to be declarative instead of imperative. (NO IF STATEMENTS.)
+	* stops on first match and excutes binding/block/function
+	Used in:
+		* destructuring
+			```
+			iex(14)> [a,b,c] = [1,2,3]
+			[1, 2, 3]
+			iex(15)> a
+			1
+			iex(16)> c
+			3
+			iex(17)> x = %{name: "Jason", age: 31, ht: 72, wt: 250} # I'm dieting. Please reserve judgement.
+			%{age: 31, ht: 72, name: "Jason", wt: 250}
+			iex(18)> %{name: name} = x
+			%{age: 31, ht: 72, name: "Jason", wt: 250}
+			iex(19)> name
+			"Jason"
+
+			```
+		* function calls
+			* see fibo.exs
+
+		* case logic
+			* see pattern_matching.exs
